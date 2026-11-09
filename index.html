@@ -1,0 +1,156 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<title>Minecraft</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>
+  * { box-sizing: border-box; user-select: none; -webkit-user-select: none; }
+  html, body { margin: 0; height: 100%; overflow: hidden; background: #000; font-family: "Courier New", Consolas, monospace; color: #fff; }
+  canvas#c { position: fixed; inset: 0; width: 100%; height: 100%; display: block; image-rendering: pixelated; }
+  img { image-rendering: pixelated; }
+  #hud { position: fixed; inset: 0; pointer-events: none; display: none; }
+  #crosshair { position: absolute; left: 50%; top: 50%; width: 22px; height: 22px; transform: translate(-50%,-50%); mix-blend-mode: difference; }
+  #crosshair:before, #crosshair:after { content: ""; position: absolute; background: #fff; }
+  #crosshair:before { left: 10px; top: 2px; width: 2px; height: 18px; }
+  #crosshair:after { left: 2px; top: 10px; width: 18px; height: 2px; }
+  #bars { position: absolute; left: 50%; bottom: 74px; width: 364px; transform: translateX(-50%); display: flex; justify-content: space-between; }
+  #hearts, #food, #air { display: flex; gap: 0; }
+  #food { flex-direction: row-reverse; }
+  #hearts img, #food img, #air img { width: 18px; height: 18px; margin-right: 0; }
+  #airwrap { position: absolute; left: 50%; bottom: 96px; width: 364px; transform: translateX(-50%); display: flex; justify-content: flex-end; }
+  #air { display: none; flex-direction: row-reverse; }
+  #hotbar { position: absolute; left: 50%; bottom: 8px; transform: translateX(-50%); display: flex; background: rgba(30,30,30,.75); border: 3px solid #111; padding: 0; }
+  .slot { position: relative; width: 44px; height: 44px; background: #8b8b8b; border: 2px solid; border-color: #373737 #fff #fff #373737; display: flex; align-items: center; justify-content: center; }
+  .slot img { width: 32px; height: 32px; display: none; pointer-events: none; }
+  .slot .count { position: absolute; right: 2px; bottom: 0; font-size: 14px; font-weight: bold; color: #fff; text-shadow: 2px 2px 0 #222; pointer-events: none; }
+  .slot .dur { position: absolute; left: 4px; right: 4px; bottom: 3px; height: 4px; background: #000; display: none; pointer-events: none; }
+  .slot .dur div { height: 100%; width: 100%; }
+  #hotbar .slot { background: rgba(60,60,60,.55); border: 2px solid #222; }
+  #hotbar .slot.sel { border: 3px solid #fff; background: rgba(120,120,120,.55); }
+  #hotbar .num { position: absolute; left: 2px; top: 0; font-size: 10px; color: #bbb; }
+  #helditem { position: absolute; left: 50%; bottom: 120px; transform: translateX(-50%); font-size: 18px; text-shadow: 2px 2px 0 #000; transition: opacity .5s; opacity: 0; white-space: nowrap; }
+  #boss { position: absolute; left: 50%; top: 14px; width: 420px; transform: translateX(-50%); text-align: center; display: none; text-shadow: 2px 2px 0 #000; }
+  #bossbar { height: 10px; background: #2a1a30; border: 2px solid #000; margin-top: 4px; }
+  #bossfill { height: 100%; width: 100%; background: #c040e0; }
+  #debug { position: absolute; left: 8px; top: 8px; display: none; background: rgba(0,0,0,.45); padding: 6px 8px; white-space: pre; font-size: 13px; line-height: 1.35; }
+  #toast { position: absolute; left: 12px; bottom: 130px; display: flex; flex-direction: column; gap: 3px; }
+  .toastline { background: rgba(0,0,0,.55); padding: 3px 8px; font-size: 14px; text-shadow: 1px 1px 0 #000; transition: opacity .6s; max-width: 520px; }
+  .toastline.fade { opacity: 0; }
+  #title { position: absolute; left: 0; right: 0; top: 22%; text-align: center; font-size: 56px; font-weight: bold; text-shadow: 4px 4px 0 #000; opacity: 0; transition: opacity 1s; letter-spacing: 3px; }
+  .fx { position: fixed; inset: 0; pointer-events: none; opacity: 0; transition: opacity .25s; }
+  #water { background: rgba(20,60,170,.38); }
+  #fire { background: linear-gradient(to top, rgba(255,120,0,.45), rgba(255,120,0,0) 45%); }
+  #flash { background: radial-gradient(ellipse at center, rgba(255,0,0,0) 40%, rgba(220,0,0,.65) 100%); transition: opacity .15s; }
+  #portalfx { background: radial-gradient(ellipse at center, rgba(160,60,255,.35), rgba(110,20,200,.8)); }
+  #screen { position: fixed; inset: 0; background: rgba(0,0,0,.5); display: none; align-items: center; justify-content: center; }
+  .panel { background: #c6c6c6; border: 4px solid; border-color: #fff #555 #555 #fff; padding: 14px 16px 16px; color: #333; box-shadow: 0 0 0 4px #000; }
+  .ptitle { font-weight: bold; margin: 0 0 6px 2px; font-size: 16px; color: #333; }
+  .ptitle.small { margin-top: 10px; }
+  .grid { display: grid; gap: 0; }
+  .craftrow { display: flex; align-items: center; gap: 18px; margin-bottom: 4px; justify-content: center; }
+  .arrow { font-size: 32px; color: #555; }
+  .furnace { display: flex; align-items: center; gap: 18px; justify-content: center; margin-bottom: 4px; }
+  .fcol { display: flex; flex-direction: column; align-items: center; gap: 6px; }
+  .flame { width: 18px; height: 18px; background: #555; position: relative; }
+  .flame div { position: absolute; left: 0; right: 0; bottom: 0; background: #ff8a1a; }
+  .prog { width: 60px; height: 14px; background: #555; border: 2px solid #333; }
+  .prog div { height: 100%; width: 0; background: #fff; }
+  #cursoritem { position: fixed; pointer-events: none; display: none; width: 36px; height: 36px; transform: translate(-18px,-18px); z-index: 50; }
+  #cursoritem img { width: 36px; height: 36px; }
+  #cursoritem span { position: absolute; right: 0; bottom: 0; font-weight: bold; text-shadow: 2px 2px 0 #222; }
+  #tooltip { position: fixed; display: none; background: rgba(16,0,16,.92); border: 2px solid #2a0a5a; padding: 3px 7px; font-size: 14px; pointer-events: none; z-index: 60; }
+  .overlay { position: fixed; inset: 0; display: none; flex-direction: column; align-items: center; justify-content: center; gap: 14px; z-index: 20; }
+  #pause { background: rgba(0,0,0,.6); }
+  #death { background: rgba(120,0,0,.55); }
+  #death h1 { font-size: 54px; margin: 0; text-shadow: 4px 4px 0 #000; }
+  .btn { background: #8b8b8b; color: #fff; border: 3px solid; border-color: #d8d8d8 #333 #333 #d8d8d8; padding: 10px 26px; font-family: inherit; font-size: 19px; cursor: pointer; min-width: 300px; text-shadow: 2px 2px 0 #333; outline: 3px solid #000; }
+  .btn:hover { background: #6d7bb8; }
+  .btn.big { font-size: 24px; padding: 14px 30px; background: #5b8c3a; border-color: #9ad06a #274414 #274414 #9ad06a; }
+  .btn.big:hover { background: #6fa646; }
+  #menu { position: fixed; inset: 0; z-index: 30; display: flex; flex-direction: column; align-items: center; justify-content: flex-start; gap: 10px;
+    background: linear-gradient(#5aa6ff 0%, #9ad0ff 55%, #5b8c3a 55%, #5b8c3a 62%, #7a5230 62%, #5a3a20 100%); overflow: auto; padding: 20px; }
+  #menu > :first-child { margin-top: auto; }
+  #menu > :last-child { margin-bottom: auto; }
+  #logo { font-size: 72px; font-weight: bold; letter-spacing: 6px; color: #d6d6d6; text-shadow: 0 5px 0 #555, 0 10px 0 #333, 6px 6px 0 #000; margin: 0; }
+  #sub { font-size: 18px; color: #fff; text-shadow: 2px 2px 0 #000; margin-top: -6px; }
+  .opts { background: rgba(0,0,0,.55); padding: 12px 16px; display: flex; flex-direction: column; gap: 8px; width: 460px; max-width: 94vw; border: 3px solid #000; }
+  .opts label { font-size: 14px; display: flex; justify-content: space-between; align-items: center; gap: 10px; }
+  .opts input[type=text], .opts select { background: #222; color: #fff; border: 2px solid #777; padding: 5px 8px; font-family: inherit; font-size: 14px; width: 200px; }
+  .skinrow { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; }
+  .skinbtn { padding: 3px 8px; background: #444; border: 2px solid #777; cursor: pointer; font-size: 13px; color: #fff; font-family: inherit; }
+  .skinbtn.on { border-color: #fff; background: #6d7bb8; }
+  #skinprev { display: flex; flex-direction: column; align-items: center; margin: 0 auto; image-rendering: pixelated; transform: scale(.7); transform-origin: top center; height: 150px; }
+  #skinprev div { display: flex; }
+  #skinprev i { display: block; }
+  .colors { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; font-size: 12px; }
+  .colors input { width: 100%; height: 24px; border: 2px solid #777; background: #222; padding: 0; }
+  #help { font-size: 12px; line-height: 1.5; color: #eee; max-width: 460px; text-align: center; text-shadow: 1px 1px 0 #000; background: rgba(0,0,0,.4); padding: 6px 10px; }
+  #loading { position: fixed; inset: 0; background: #2a1a10; z-index: 40; display: none; flex-direction: column; align-items: center; justify-content: center; gap: 14px; }
+  #loading .bar { width: 340px; height: 14px; background: #000; border: 2px solid #777; }
+  #loading .bar div { height: 100%; width: 0%; background: #6fe04a; }
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+
+<div id="hud">
+  <div id="crosshair"></div>
+  <div id="boss"><div>Enderdrache</div><div id="bossbar"><div id="bossfill"></div></div></div>
+  <div id="debug"></div>
+  <div id="toast"></div>
+  <div id="title"></div>
+  <div id="helditem"></div>
+  <div id="airwrap"><div id="air"></div></div>
+  <div id="bars"><div id="hearts"></div><div id="food"></div></div>
+  <div id="hotbar"></div>
+</div>
+<div class="fx" id="water"></div>
+<div class="fx" id="fire"></div>
+<div class="fx" id="flash"></div>
+<div class="fx" id="portalfx"></div>
+
+<div id="screen"></div>
+<div id="cursoritem"></div>
+<div id="tooltip"></div>
+
+<div id="pause" class="overlay">
+  <h1 style="font-size:44px;margin:0;text-shadow:3px 3px 0 #000">Spiel pausiert</h1>
+  <button class="btn" id="resume">Weiter spielen</button>
+  <button class="btn" id="tomenu">Hauptmenü</button>
+  <div style="font-size:13px;text-shadow:1px 1px 0 #000">WASD laufen · Leertaste springen · Shift schleichen · Strg rennen · E Inventar · L Strukturen finden · F3 Debug · F5 Kamera</div>
+</div>
+<div id="death" class="overlay">
+  <h1>Du bist gestorben!</h1>
+  <div id="deathcause" style="font-size:20px;text-shadow:2px 2px 0 #000"></div>
+  <button class="btn big" id="respawn">Wiederbeleben</button>
+  <button class="btn" id="tomenu2">Hauptmenü</button>
+</div>
+
+<div id="loading"><div id="loadtext" style="font-size:22px">Welt wird erstellt...</div><div class="bar"><div id="loadfill"></div></div></div>
+
+<div id="menu">
+  <h1 id="logo">MINECRAFT</h1>
+  <div id="sub">Blöcke abbauen · bauen · Drachen besiegen</div>
+  <button class="btn big" id="create">Welt erstellen</button>
+  <div class="opts">
+    <label>Welten-Seed (optional) <input type="text" id="seed" placeholder="zufällig"></label>
+    <label>Sichtweite
+      <select id="dist"><option value="4">Nah (4 Chunks)</option><option value="6" selected>Normal (6 Chunks)</option><option value="8">Weit (8 Chunks)</option><option value="10">Sehr weit (10 Chunks)</option></select>
+    </label>
+    <div style="font-size:14px">Skin (blockig!)</div>
+    <div class="skinrow" id="skins"></div>
+    <div id="skinprev"></div>
+    <div class="colors">
+      <label style="flex-direction:column">Haut<input type="color" id="c_skin"></label>
+      <label style="flex-direction:column">Haare<input type="color" id="c_hair"></label>
+      <label style="flex-direction:column">Shirt<input type="color" id="c_shirt"></label>
+      <label style="flex-direction:column">Hose<input type="color" id="c_pants"></label>
+    </div>
+  </div>
+  <div id="help"><b>Steuerung:</b> W A S D laufen · Leertaste springen · Shift schleichen · Strg rennen · Linke Maustaste abbauen / angreifen · Rechte Maustaste platzieren / benutzen / essen · 1–9 oder Mausrad Hotbar · E Inventar · Q wegwerfen · L Strukturen finden · F3 Debug · F5 Kamera</div>
+</div>
+
+<script src="dist/game.js"></script>
+</body>
+</html>
